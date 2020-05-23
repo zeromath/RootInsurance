@@ -7,7 +7,7 @@ def updateQ(prev_q, next_q, reward, alpha=0.2, discount_factor=0.2):
 
 class Player:
     def __init__(self, num_total, num_states=16, price_range=(5, 20)):
-        self.max_price, self.min_price = price_range
+        self.min_price, self.max_price = price_range
         self.num_sold = 0
         self.num_clicked = 0
         self.current_price = 0
@@ -30,7 +30,7 @@ class Player:
         return self.current_price
 
 class Auctioneer:
-    def __init__(self, n_players, n_total_rounds, p_vehicle, p_driver, p_insured, p_marital, recording = False):
+    def __init__(self, n_total_rounds, p_vehicle, p_driver, p_insured, p_marital, n_players = 5, recording = False):
         self.p_vehicle = p_vehicle
         self.p_driver = p_driver
         self.p_insured = p_insured
