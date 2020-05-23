@@ -7,7 +7,7 @@ def updateQ(prev_q, next_q, reward, alpha=0.2, discount_factor=0.2):
 
 class Player:
     def __init__(self, num_total, num_states=16, price_range=(5, 20)):
-        self.max_price, self.min_price = price_range
+        self.min_price, self.max_price = price_range
         self.num_sold = 0
         self.num_clicked = 0
         self.current_price = 0
