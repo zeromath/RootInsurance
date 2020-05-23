@@ -30,7 +30,7 @@ class Player:
         return self.current_price
 
 class Auctioneer:
-    def __init__(self, n_players, n_total_rounds, p_vehicle, p_driver, p_insured, p_marital, recording = False):
+    def __init__(self, n_total_rounds, p_vehicle, p_driver, p_insured, p_marital, n_players = 5, recording = False):
         self.p_vehicle = p_vehicle
         self.p_driver = p_driver
         self.p_insured = p_insured
