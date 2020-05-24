@@ -205,7 +205,7 @@ class SmartCompany(Company):
         """
         prev_q = q_table[self.num_clicked, self.num_sold, state, self.current_price]
         next_max_q = np.max(q_table[self.num_clicked + is_clicked, self.num_sold + is_sold])
-        q_table[self.num_clicked, self.num_sold, state, self.current_price] = self.updateQ(pewv_q, next_max_q, reward, alpha=0.2, discount_factor=0.2)
+        q_table[self.num_clicked, self.num_sold, state, self.current_price] = self.updateQ(prev_q, next_max_q, reward, alpha=0.2, discount_factor=0.2)
 
     def updateStates(self, is_clicked, is_sold, rank, state):
         """update q_table, num_sold, num_clicked; calculating reward
