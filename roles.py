@@ -1,12 +1,173 @@
 import numpy as np
-import pandas as pd
-from random import randint
+# import pandas as pd
+# from random import randint
 
-def updateQ(prev_q, next_q, reward, alpha=0.2, discount_factor=0.2):
-    return (1 - alpha) * prev_q + alpha * (reward + discount_factor * next_max_q)
+def updateQ(prev_q, next_q, reward, learning_rate=0.2, discount_factor=0.2):
+    return (1 - learning_rate) * prev_q + learning_rate * (reward + discount_factor * next_max_q)
+
+#####################################################################
+########################### Company class ###########################
+#####################################################################
 
 class Company:
     '''The class of all companies'''
+    def __init__(self, num_rounds, choices, num_states=16):
+        self.num_rounds = num_rounds
+        self.choices = choices
+        self.customer_type = None
+        # q_table is a constant vector defining the distribution of bids for combination of state. Each row i sum up to 1, representing the distribution of bids for the i-th type of customer
+        self.q_table = np.zeros([num_states, choices.size])
+
+    def setCustomerType(self, state):
+        """ Update current state after receiving the information given by the Bidding Website
+
+        Parameters:
+            state (int): The customer type as given by the Bidding Website
+
+        Returns:
+            None
+        """
+        self.customer_type = state
+
+    def bid(self):
+        choice = np.random.choice(q_table[self.customer_type].size, q_table[self.customer_type])
+        return self.q_table[self.customer_type, choice]
+
+
+#####################################################################
+######################## Smarrt Company class #######################
+#####################################################################
+
+class SmartCompany(Company):
+    '''The class of a smart companies that uses RL to optimize its strategies. It is a child class of the Company class'''
+
+    def __init__(self, num_rounds, choices, learning_rate=.2,
+                discount_factor=.8, num_states=16):
+        """ Initialization function
+
+        Parameters:
+            num_rounds (int):   Number of total rounds
+            choices (np.array): Possible choices for bid price
+            num_states (int):   Default 16 states (8 * v + 4 * d + 2 * m + i)
+
+        Returns:
+            None
+        """
+        self.num_rounds = num_rounds
+        self.clicked = 0
+        self.sold = 0
+        self.choices = choices
+
+        self.last_choice = None
+        self.current_price = None
+
+        self.customer_type = None # last customer we saw
+        self.learning_rate = learning_rate
+        self.discount_factor = discount_factor
+
+        # Initialize q table
+        self.q_table = np.zeros( [num_total, num_total,
+                                 num_states, choices.size] )
+
+
+    def computeReward(self, clicked, sale):
+        """ Compute reward for our action, given the clicking and sale information returned by the Bidding Website
+
+        Parameters:
+            clicked (int): 1 if clicked, 0 if not clicked
+            sale (int):    1 if policy sold, 0 if not sold
+        """
+        ### TODO ###
+        pass
+
+    def setCustomerType(self, state):
+        """ Update current state after receiving the information given by the Bidding Website
+
+        Parameters:
+            state (int): The customer type as given by the Bidding Website
+
+        Returns:
+            None
+        """
+        self.customer_type = state
+
+######## The main idea of these functions are not changed ########
+
+    def bid(self):
+        """generate price for this bid
+
+        Parameters:
+            None
+
+        Returns:
+            int: the bid we submit
+        """
+
+        # Get the index of optimal choice,
+        # i.e. choice that maxize expected payoff
+        index_of_optimal_choice = np.argmax(self.q_table[self.num_clicked, self.num_sold, self.customer_type])
+
+        # Get optimal choice
+        self.current_price = self.choices[index_of_optimal_choice]
+
+        # Return optimal choice
+        return self.current_price
+
+    # This was called "setQ" in Zhan's code
+    def updateQ(self, is_clicked, is_sold, state, action_index, reward,
+            alpha=0.2, discount_factor=0.2):
+        """ Update Q table. This is triggered when we have made a new choice but haven't arrived at a new state
+
+        Parameters:
+            is_clicked (int):        0 for not clicked, 1 for clicked
+            is_sold (int):           0 for not clicked, 1 for clicked
+            state (int):             0-15, current customer's state
+            action_index(int):       choice among possible actions
+            reward (int):            the reward resulting from the bidding price
+            alpha (float):           0-1, learning_rate
+            discount_factor (float): 0-1, factor discounting future rewards
+
+        Returns:
+            None
+        """
+        # Get previous q_table[state, action]
+        prev_q = q_table[self.num_clicked, self.num_sold,
+                         state, action_index]
+
+        # Retrieve previous optimal future value
+        optimal_future_value = np.max(q_table[self.num_clicked + is_clicked,
+                                    self.num_sold + is_sold])
+
+        # Update q_table according to rewards received
+        q_table[self.num_clicked, self.num_sold,
+                state, self.current_price] = \
+            self.updateQ(prev_q, optimal_future_value,
+            reward, alpha, discount_factor)
+
+
+    def updateState(self, is_clicked, is_sold, rank, state):
+        """update q_table, num_sold, num_clicked; calculating reward
+
+        Parameters:
+            is_clicked (int): 0 for not clicked, 1 for clicked
+            is_sold (int):    0 for not clicked, 1 for clicked
+            rank (int):       the rank of this bid.
+            state (int):      0-15, current customer's state
+
+        Returns:
+            None
+        """
+        # Compute reward to update q_table
+        reward = self.computeReward(is_clicked, is_sold)
+
+        self.updateQ(is_clicked, is_sold, state, self.last_choice, reward)
+        slef.num_clicked += is_clicked
+        self.num_sold += is_sold
+
+
+
+################# Zhan's original code #################
+
     def __init__(self, num_total, updateQ, num_states=16, price_range=(5, 20)):
         """Initialization function
 
@@ -75,10 +236,14 @@ class Company:
         self.current_price = np.argmax(q_table[self.num_clicked, self.num_sold, state]) + self.min_price
         return self.current_price
 
+#######################################################################
+######################### SearchWebsite class #########################
+#######################################################################
+
 class SearchWebsite:
     '''The class of the searching website'''
 
-    def __init__(self, customer_distribution, recording=False):
+    def __init__(self, customer_distribution, n_companies=5, recording=False):
         """Initialization function
 
         Parameters:
@@ -90,6 +255,8 @@ class SearchWebsite:
             None
         """
         self.distribution = customer_distribution
+        self.prob_click = np.zeros([customer_distribution.size, n_companies])
+        self.prob_sale = np.zeros([customer_distribution.size, n_companies])
         self.recording = recording
 
 
@@ -121,27 +288,28 @@ class SearchWebsite:
         return rank
 
 
-    def getReward(self, revenue, bid, rank):
+    def rewardDecision(self, customer_type, rank):
         ''' Generates rewards and selling status according to rank
-        Args:
-            bid (float): our bid
-            rank (float): our rank
+
+        Parameters:
+            customer_type (int): customer type
+            rank (int): the company's rank
+
         Returns:
-            rewards (float): rewards
             click (int): 1 iff clicked
             sold (int): 1 iff sold
         '''
-        prob_clicking = self.param_['click_prob_'][rank]
-        prob_selling = self.param_['sale_prob_'][rank]
+        prob_clicking = self.prob_click[customer_type, rank]
+        prob_selling = self.prob_sale[customer_type, rank]
         outcome = np.random.rand()
         if outcome < prob_selling:
             # policy sold!
-            return (revenue-bid, 1,1)
+            return (1,1)
         if outcome < prob_clicking:
             # clicked but not sold
-            return (-bid, 1,0)
+            return (1,0)
         # did not click
-        return (0,0,0)
+        return (0,0)
 
 
 
@@ -149,11 +317,6 @@ class SearchWebsite:
 
 
 
-
-
-
-
-        
 ################# Zhan's original code #################
     def __init__(self, n_total_rounds, p_vehicle, p_driver, p_insured, p_marital, n_companies = 5, recording = False):
         """Initialization function
