@@ -161,7 +161,7 @@ class SmartCompany(Company):
         reward = self.computeReward(is_clicked, is_sold)
 
         self.updateQ(is_clicked, is_sold, state, self.last_choice, reward)
-        slef.num_clicked += is_clicked
+        self.num_clicked += is_clicked
         self.num_sold += is_sold
 
 
@@ -221,7 +221,7 @@ class SmartCompany(Company):
         """
         reward = 10 # some formula involing current_price and rank
         self.setQ(is_clicked, is_sold, state, self.current_price, reward)
-        slef.num_clicked += is_clicked
+        self.num_clicked += is_clicked
         self.num_sold += is_sold
 
     def getPrice(self, state):
