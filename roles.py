@@ -24,7 +24,7 @@ class Company:
         self.num_clicked = 0   # number of impressions clicked currently
         self.current_price = 0 # bidding price for current customer
         self.updateQ = updateQ
-        
+
         # shape: num_clicked  x  num_sold  x  num_states  x  num_price(actions)
         self.q_table = np.zeros([num_total, num_total, num_states, self.max_price - self.min_price + 1])
 
@@ -62,7 +62,7 @@ class Company:
         self.setQ(is_clicked, is_sold, state, self.current_price, reward)
         slef.num_clicked += is_clicked
         self.num_sold += is_sold
-    
+
     def getPrice(self, state):
         """generate price for this bid
 
@@ -77,6 +77,84 @@ class Company:
 
 class SearchWebsite:
     '''The class of the searching website'''
+
+    def __init__(self, customer_distribution, recording=False):
+        """Initialization function
+
+        Parameters:
+            customer_distribution (np.array): distribution of customers.
+                i-th entry = probability that a customer is in the i-th category
+            recording (boolean): whether to record every impression result.
+
+        Returns:
+            None
+        """
+        self.distribution = customer_distribution
+        self.recording = recording
+
+
+    def generateRandomCustomer(self):
+        """Generate a random customer
+
+        Parameters:
+            self
+
+        Returns:
+            int: an int between 0 and 15 representing a customer's state.
+        """
+        return np.random.choice(16, p=self.distribution)
+
+
+    def rankBid(self, bids):
+        ''' Computes the rank given bids
+
+        Parameters:
+            bids (list): list of bids
+
+        Returns:
+            rank (list): rank of bids. rank[i] = ranking of i-th bid in bids
+        '''
+        bids_sorted = sorted( [(bid,company) for company,bid in enumerate(bids)] , reverse=True)
+        rank = [0]*len(bids)
+        for r, pair in enumerate(bids_sorted):
+            rank[pair[1]] = r
+        return rank
+
+
+    def getReward(self, revenue, bid, rank):
+        ''' Generates rewards and selling status according to rank
+        Args:
+            bid (float): our bid
+            rank (float): our rank
+        Returns:
+            rewards (float): rewards
+            click (int): 1 iff clicked
+            sold (int): 1 iff sold
+        '''
+        prob_clicking = self.param_['click_prob_'][rank]
+        prob_selling = self.param_['sale_prob_'][rank]
+        outcome = np.random.rand()
+        if outcome < prob_selling:
+            # policy sold!
+            return (revenue-bid, 1,1)
+        if outcome < prob_clicking:
+            # clicked but not sold
+            return (-bid, 1,0)
+        # did not click
+        return (0,0,0)
+
+
+
+
+
+
+
+
+
+
+
+        
+################# Zhan's original code #################
     def __init__(self, n_total_rounds, p_vehicle, p_driver, p_insured, p_marital, n_companies = 5, recording = False):
         """Initialization function
 
@@ -141,7 +219,7 @@ class SearchWebsite:
         # need some algorithm to generate the result, right now, whoever bid highest get the policy sold
         # None for no policy sold
         return ranking[0], ranking[:3], ranking[3:]
-    
+
     def auction(self):
         """auction process
 
