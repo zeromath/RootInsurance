@@ -66,7 +66,7 @@ class SmartCompany(Company):
         self.discount_factor = discount_factor
 
         # Initialize q table
-        self.q_table = np.zeros( [num_total, num_total,
+        self.q_table = np.zeros( [num_rounds, num_rounds,
                                  num_states, choices.size] )
 
 
