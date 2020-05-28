@@ -2,7 +2,19 @@ import numpy as np
 # import pandas as pd
 # from random import randint
 
-def updateQ(prev_q, next_q, reward, learning_rate=0.2, discount_factor=0.2):
+def updateQ(prev_q, next_max_q, reward,
+            learning_rate=0.2, discount_factor=0.2):
+    """ Method for updating q_table
+
+    Parameters:
+        prev_q (float): previous q_value
+        next_max_q (float): maximum expected q_value
+        reward (float): reward given by the environment
+        learning_rate (float): balance between new and old info
+        discount_factor (float): balance between near and far future rewards
+
+    Returns: the value to be filled into new q_table
+    """
     return (1 - learning_rate) * prev_q + learning_rate * (reward + discount_factor * next_max_q)
 
 #####################################################################
@@ -15,8 +27,12 @@ class Company:
         self.num_rounds = num_rounds
         self.choices = choices
         self.customer_type = None
-        # q_table is a constant vector defining the distribution of bids for combination of state. Each row i sum up to 1, representing the distribution of bids for the i-th type of customer
+
+        # q_table is a constant vector defining the distribution of bids for
+        # combination of state. Each row i sum up to 1, representing the
+        # distribution of bids for the i-th type of customer
         self.q_table = np.zeros([num_states, choices.size])
+
 
     def setCustomerType(self, state):
         """ Update current state after receiving the information given by the Bidding Website
@@ -30,7 +46,9 @@ class Company:
         self.customer_type = state
 
     def bid(self):
-        choice = np.random.choice(q_table[self.customer_type].size, q_table[self.customer_type])
+        choice = np.random.choice(self.q_table[self.customer_type].size,
+                                  self.q_table[self.customer_type])
+
         return self.q_table[self.customer_type, choice]
 
 
@@ -38,11 +56,12 @@ class Company:
 ######################## Smarrt Company class #######################
 #####################################################################
 
-class SmartCompany(Company):
-    '''The class of a smart companies that uses RL to optimize its strategies. It is a child class of the Company class'''
+class SmartCompany:
+    '''The class of a smart companies that uses RL to optimize its strategies.
+    '''
 
     def __init__(self, num_rounds, choices, learning_rate=.2,
-                discount_factor=.8, num_states=16):
+                 discount_factor=.8, num_states=16):
         """ Initialization function
 
         Parameters:
@@ -66,19 +85,20 @@ class SmartCompany(Company):
         self.discount_factor = discount_factor
 
         # Initialize q table
-        self.q_table = np.zeros( [num_total, num_total,
-                                 num_states, choices.size] )
+        self.q_table = np.zeros( [num_rounds, num_rounds,
+                                  num_states, choices.size] )
 
 
     def computeReward(self, clicked, sale):
-        """ Compute reward for our action, given the clicking and sale information returned by the Bidding Website
+        """ Compute reward for our action, given the clicking and sale
+            information returned by the Bidding Website
 
         Parameters:
             clicked (int): 1 if clicked, 0 if not clicked
             sale (int):    1 if policy sold, 0 if not sold
         """
         ### TODO ###
-        pass
+        return 10
 
     def setCustomerType(self, state):
         """ Update current state after receiving the information given by the Bidding Website
@@ -105,7 +125,8 @@ class SmartCompany(Company):
 
         # Get the index of optimal choice,
         # i.e. choice that maxize expected payoff
-        index_of_optimal_choice = np.argmax(self.q_table[self.num_clicked, self.num_sold, self.customer_type])
+        index_of_optimal_choice = np.argmax(self.q_table[self.num_clicked,
+                                            self.num_sold, self.customer_type])
 
         # Get optimal choice
         self.current_price = self.choices[index_of_optimal_choice]
@@ -115,7 +136,7 @@ class SmartCompany(Company):
 
     # This was called "setQ" in Zhan's code
     def updateQ(self, is_clicked, is_sold, state, action_index, reward,
-            alpha=0.2, discount_factor=0.2):
+                alpha=0.2, discount_factor=0.2):
         """ Update Q table. This is triggered when we have made a new choice but haven't arrived at a new state
 
         Parameters:
@@ -131,15 +152,16 @@ class SmartCompany(Company):
             None
         """
         # Get previous q_table[state, action]
-        prev_q = q_table[self.num_clicked, self.num_sold,
-                         state, action_index]
+        prev_q = self.q_table[self.num_clicked, self.num_sold,
+                              state, action_index]
 
         # Retrieve previous optimal future value
-        optimal_future_value = np.max(q_table[self.num_clicked + is_clicked,
-                                    self.num_sold + is_sold])
+        optimal_future_value = np.max(self.q_table[self.num_clicked + \
+                                                  is_clicked,
+                                      self.num_sold + is_sold])
 
         # Update q_table according to rewards received
-        q_table[self.num_clicked, self.num_sold,
+        self.q_table[self.num_clicked, self.num_sold,
                 state, self.current_price] = \
             self.updateQ(prev_q, optimal_future_value,
             reward, alpha, discount_factor)
@@ -161,7 +183,7 @@ class SmartCompany(Company):
         reward = self.computeReward(is_clicked, is_sold)
 
         self.updateQ(is_clicked, is_sold, state, self.last_choice, reward)
-        slef.num_clicked += is_clicked
+        self.num_clicked += is_clicked
         self.num_sold += is_sold
 
 
@@ -205,7 +227,7 @@ class SmartCompany(Company):
         """
         prev_q = q_table[self.num_clicked, self.num_sold, state, self.current_price]
         next_max_q = np.max(q_table[self.num_clicked + is_clicked, self.num_sold + is_sold])
-        q_table[self.num_clicked, self.num_sold, state, self.current_price] = self.updateQ(pewv_q, next_max_q, reward, alpha=0.2, discount_factor=0.2)
+        q_table[self.num_clicked, self.num_sold, state, self.current_price] = self.updateQ(prev_q, next_max_q, reward, alpha=0.2, discount_factor=0.2)
 
     def updateStates(self, is_clicked, is_sold, rank, state):
         """update q_table, num_sold, num_clicked; calculating reward
@@ -221,7 +243,7 @@ class SmartCompany(Company):
         """
         reward = 10 # some formula involing current_price and rank
         self.setQ(is_clicked, is_sold, state, self.current_price, reward)
-        slef.num_clicked += is_clicked
+        self.num_clicked += is_clicked
         self.num_sold += is_sold
 
     def getPrice(self, state):
