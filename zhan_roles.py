@@ -8,12 +8,12 @@ def updateQ(prev_q, next_q, reward, alpha=0.2, discount_factor=0.2):
 
 class Company:
     '''The class of all companies'''
-    def __init__(self, num_total, updateQ, num_states=16, price_range=(5, 20)):
+    def __init__(self, updateQ, num_total=100, num_states=16, price_range=(5, 20)):
         """Initialization function
 
         Parameters:
-            num_total (int):     Number of total rounds
             updateQ (function):  Function for updating the q_table
+            num_total (int):     Number of total rounds
             num_states (int):    default 16 states (8 * v + 4 * d + 2 * m + i)
             price_range (tuple): the tuple of (min_price, max_price), default (5, 20)
 
@@ -23,28 +23,37 @@ class Company:
         self.min_price, self.max_price = price_range
         self.num_sold = 0      # number of policies sold currently
         self.num_clicked = 0   # number of impressions clicked currently
-        self.test = False
+        self.train = True
         self.num_total_sold = 0
         self.num_total = num_total
         self.current_price = 0 # bidding price for current customer
         self.updateQ = updateQ
         self.record = {'click':[], 
-                                    'currently_insured':[], 
-                                    'number_of_vehicles':[],
-                                    'number_of_drivers':[], 
-                                    'rank':[], 
-                                    'policies sold':[], 
-                                    'married':[]}
+                       'currently_insured':[], 
+                       'number_of_vehicles':[],
+                       'number_of_drivers':[], 
+                       'rank':[], 
+                       'policies sold':[], 
+                       'married':[],
+                       'current_price':[]}
 
         # shape: num_clicked  x  num_sold  x  num_states  x  num_price(actions)
         self.q_table = np.zeros([num_total + 1, num_total + 1, num_states, self.max_price - self.min_price + 1])
         
     def reset(self):
-        self.num_sold = 0
+        self.num_sold = 0   
         self.num_clicked = 0
-        self.current_price = 0
+        self.num_total_sold = 0
+        self.record = {'click':[], 
+                       'currently_insured':[], 
+                       'number_of_vehicles':[],
+                       'number_of_drivers':[], 
+                       'rank':[], 
+                       'policies sold':[], 
+                       'married':[],
+                       'current_price':[]}
 
-    def setQ(self, is_clicked, is_sold, state, reward, alpha=0.2, discount_factor=0.2):
+    def updateQTable(self, is_clicked, is_sold, state, reward, alpha=0.2, discount_factor=0.2):
         """set Q value
 
         Parameters:
@@ -59,7 +68,10 @@ class Company:
             None
         """
         prev_q = self.q_table[self.num_clicked, self.num_sold, state, self.current_price]
-        next_max_q = np.max(self.q_table[self.num_clicked + is_clicked, self.num_sold + is_sold])
+        next_max_q = np.max(self.q_table[(self.num_clicked + is_clicked) % self.num_total, 
+                                         (self.num_sold + is_sold) % self.num_total])
+        
+        # update Q table
         self.q_table[self.num_clicked, self.num_sold, state, self.current_price] = self.updateQ(prev_q, next_max_q, reward, alpha=0.2, discount_factor=0.2)
 
     def updateStates(self, is_clicked, is_sold, rank, state):
@@ -74,12 +86,10 @@ class Company:
         Returns:
             None
         """
-        if self.test:
-            self.num_clicked += is_clicked
-            self.num_clicked %= self.num_total
-            self.num_sold += is_sold
-            self.num_sold %= self.num_total
-            self.num_total_sold += is_sold
+        if self.train:
+            reward = - self.current_price * is_clicked + 10 * self.max_price * is_sold
+            self.updateQTable(is_clicked, is_sold, state, self.current_price, reward)
+        else:
             self.record['click'].append(is_clicked)
             self.record['currently_insured'].append(state % 2)
             self.record['number_of_vehicles'].append(state // 8)
@@ -87,11 +97,12 @@ class Company:
             self.record['rank'].append(rank)
             self.record['policies sold'].append(is_sold)
             self.record['married'].append((state // 2) % 2)
-            return
-        reward = - self.current_price * is_clicked + 10 * self.max_price * is_sold
-        self.setQ(is_clicked, is_sold, state, self.current_price, reward)
-        self.num_clicked += is_clicked
-        self.num_sold += is_sold
+            self.record['current_price'].append(self.current_price + self.min_price)
+            
+        self.num_total_sold += is_sold
+        self.num_clicked = (self.num_clicked + is_clicked) % self.num_total
+        self.num_sold = (self.num_sold + is_sold) % self.num_total
+        
 
     def getPrice(self, state, epsilon = 0.1):
         """generate price for this bid
@@ -125,6 +136,7 @@ class SearchWebsite:
         Returns:
             None
         """
+        self.n_total_rounds = n_total_rounds
         self.p_vehicle = p_vehicle
         self.p_driver = p_driver
         self.p_insured = p_insured
@@ -135,7 +147,7 @@ class SearchWebsite:
 
         # the list of all companies, each company is represented by its index,
         # i.e. self.companies[0] represents Company 0
-        self.companies = [Company(n_total_rounds,  updateQ) for _ in range(n_companies)]
+        self.companies = [Company(updateQ) for _ in range(n_companies)]
         
         self.customer_click_prob = [
             [0.571429, 0.200000, 0.100000, 0, 0],       #0
@@ -154,72 +166,24 @@ class SearchWebsite:
             [0, 0.137931, 0.143939, 0.036765, 0.020833],#13
             [0, 0.193548, 0.123077, 0.039370, 0.022989],#14
             [0, 0.231884, 0.167939, 0.033784, 0.033333]]
-        self.customer_buy_prob = [[0.8974358974358975, 0, 0.05128205128205128, 0.05128205128205128, 0, 0],
- [0.8205128205128205,
-  0,
-  0.10256410256410256,
-  0.05128205128205128,
-  0,
-  0.02564102564102564],
- [0.8820375335120644,
-  0,
-  0.06032171581769437,
-  0.030831099195710455,
-  0.020107238605898123,
-  0.006702412868632707],
- [0.9128065395095368,
-  0,
-  0.04632152588555858,
-  0.012261580381471389,
-  0.02316076294277929,
-  0.005449591280653951],
- [0.8154657293497364,
-  0,
-  0.1335676625659051,
-  0.033391915641476276,
-  0.01757469244288225,
-  0],
- [0.9471890971039182,
-  0,
-  0.027257240204429302,
-  0.015332197614991482,
-  0.008517887563884156,
-  0.0017035775127768314],
- [0.8620689655172413,
-  0,
-  0.11494252873563218,
-  0.019704433497536946,
-  0.003284072249589491,
-  0],
- [0.9511784511784511,
-  0,
-  0.021885521885521887,
-  0.0101010101010101,
-  0.015151515151515152,
-  0.0016835016835016834],
- [0.9819819819819819, 0, 0, 0, 0.009009009009009009, 0.009009009009009009],
- [0.978494623655914, 0, 0, 0, 0.021505376344086023, 0],
- [0.9811227024341779, 0, 0, 0, 0.014903129657228016, 0.003974167908594138],
- [0.9888132295719845, 0, 0, 0, 0.00632295719844358, 0.0048638132295719845],
- [0.96900826446281,
-  0,
-  0,
-  0.014462809917355372,
-  0.012396694214876033,
-  0.004132231404958678],
- [0.9800443458980045,
-  0,
-  0,
-  0.006651884700665188,
-  0.008869179600886918,
-  0.004434589800443459],
- [0.9725400457665904, 0, 0, 0.016018306636155607, 0.011441647597254004, 0],
- [0.9817351598173516,
-  0,
-  0,
-  0.0045662100456621,
-  0.0091324200913242,
-  0.0045662100456621]]
+        self.customer_buy_prob = [
+            [0.8974358974358975, 0.05128205128205128, 0.05128205128205128, 0, 0, 0], 
+            [0.8205128205128205, 0.10256410256410256, 0.05128205128205128, 0, 0.02564102564102564, 0], 
+            [0.8820375335120644, 0.06032171581769437, 0.030831099195710455, 0.020107238605898123, 0.006702412868632708, 0], 
+            [0.9128065395095368, 0.04632152588555858, 0.01226158038147139, 0.02316076294277929, 0.005449591280653951, 0], 
+            [0.8154657293497364, 0.1335676625659051, 0.033391915641476276, 0.01757469244288225, 0, 0], 
+            [0.9471890971039182, 0.027257240204429302, 0.015332197614991482, 0.008517887563884156, 0.0017035775127768314, 0], 
+            [0.8620689655172413, 0.11494252873563218, 0.019704433497536946, 0.003284072249589491, 0, 0], 
+            [0.9511784511784511, 0.021885521885521887, 0.010101010101010102, 0.015151515151515152, 0.0016835016835016834, 0], 
+            [0.9819819819819819, 0, 0, 0.009009009009009009, 0.009009009009009009, 0], 
+            [0.978494623655914, 0, 0, 0.021505376344086023, 0, 0], 
+            [0.9746646795827124, 0, 0, 0.014903129657228018, 0.003974167908594138, 0.006458022851465474], 
+            [0.9844357976653697, 0, 0, 0.00632295719844358, 0.0048638132295719845, 0.004377431906614786], 
+            [0.9669421487603306, 0, 0.014462809917355372, 0.012396694214876033, 0.004132231404958678, 0.002066115702479339], 
+            [0.9800443458980044, 0, 0.0066518847006651885, 0.008869179600886918, 0.004434589800443459, 0], 
+            [0.9725400457665904, 0, 0.016018306636155607, 0.011441647597254004, 0, 0], 
+            [0.9794520547945206, 0, 0.0045662100456621, 0.0091324200913242, 0.0045662100456621, 0.00228310502283105]
+        ]
 
     def generateRandomCustomer(self,p_vehicle, p_driver, p_insured, p_marital):
         """Generate a random customer
@@ -257,20 +221,22 @@ class SearchWebsite:
         """
         # need some algorithm to generate the result, right now, whoever bid highest get the policy sold
         # None for no policy sold
+        sold = np.random.choice(np.arange(-1, 5), p=self.customer_buy_prob[state])
+        
         clicked = []
         not_clicked = []
         for i in range(self.n_companies):
-            t = np.random.binomial(1, self.customer_click_prob[state][i])
-            if t == 1:
-                clicked.append(ranking[i])
-            else:
-                not_clicked.append(ranking[i])
+            if i != sold:
+                t = np.random.binomial(1, self.customer_click_prob[state][i])
+                if t == 1:
+                    clicked.append(ranking[i])
+                else:
+                    not_clicked.append(ranking[i])
         
-        sold = np.random.choice(np.arange(-1, 5), p=self.customer_buy_prob[state])
         return sold, clicked, not_clicked
 
     def train(self):
-        for _ in range(100):
+        for _ in range(self.n_total_rounds):
             self.auction()
         self.reset()
     
@@ -279,6 +245,13 @@ class SearchWebsite:
         for company in self.companies:
             company.reset()
         
+    def test(self):
+        self.auction_result = []
+        for company in self.companies:
+            company.reset()
+            company.train = False
+        for _ in range(self.n_total_rounds):
+            self.auction()
         
     def auction(self):
         """auction process
@@ -306,7 +279,6 @@ class SearchWebsite:
         if sold != -1:
             self.companies[sold].updateStates(1, 1, ranking.index(sold), state)
         for i in clicked:
-            if i != sold:
                 self.companies[i].updateStates(1, 0, ranking.index(i), state)
         for i in not_clicked:
             self.companies[i].updateStates(0, 0, ranking.index(i), state)
