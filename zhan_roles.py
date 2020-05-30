@@ -23,8 +23,18 @@ class Company:
         self.min_price, self.max_price = price_range
         self.num_sold = 0      # number of policies sold currently
         self.num_clicked = 0   # number of impressions clicked currently
+        self.test = False
+        self.num_total_sold = 0
+        self.num_total = num_total
         self.current_price = 0 # bidding price for current customer
         self.updateQ = updateQ
+        self.record = {'click':[], 
+                                    'currently_insured':[], 
+                                    'number_of_vehicles':[],
+                                    'number_of_drivers':[], 
+                                    'rank':[], 
+                                    'policies sold':[], 
+                                    'married':[]}
 
         # shape: num_clicked  x  num_sold  x  num_states  x  num_price(actions)
         self.q_table = np.zeros([num_total + 1, num_total + 1, num_states, self.max_price - self.min_price + 1])
@@ -64,7 +74,21 @@ class Company:
         Returns:
             None
         """
-        reward = - self.current_price * is_clicked + 2 * self.max_price * is_sold
+        if self.test:
+            self.num_clicked += is_clicked
+            self.num_clicked %= self.num_total
+            self.num_sold += is_sold
+            self.num_sold %= self.num_total
+            self.num_total_sold += is_sold
+            self.record['click'].append(is_clicked)
+            self.record['currently_insured'].append(state % 2)
+            self.record['number_of_vehicles'].append(state // 8)
+            self.record['number_of_drivers'].append((state // 4) % 2)
+            self.record['rank'].append(rank)
+            self.record['policies sold'].append(is_sold)
+            self.record['married'].append((state // 2) % 2)
+            return
+        reward = - self.current_price * is_clicked + 10 * self.max_price * is_sold
         self.setQ(is_clicked, is_sold, state, self.current_price, reward)
         self.num_clicked += is_clicked
         self.num_sold += is_sold
@@ -245,6 +269,11 @@ class SearchWebsite:
         sold = np.random.choice(np.arange(-1, 5), p=self.customer_buy_prob[state])
         return sold, clicked, not_clicked
 
+    def train(self):
+        for _ in range(100):
+            self.auction()
+        self.reset()
+    
     def reset(self):
         self.auction_result = []
         for company in self.companies:
@@ -277,7 +306,8 @@ class SearchWebsite:
         if sold != -1:
             self.companies[sold].updateStates(1, 1, ranking.index(sold), state)
         for i in clicked:
-            self.companies[i].updateStates(1, 0, ranking.index(i), state)
+            if i != sold:
+                self.companies[i].updateStates(1, 0, ranking.index(i), state)
         for i in not_clicked:
             self.companies[i].updateStates(0, 0, ranking.index(i), state)
 
