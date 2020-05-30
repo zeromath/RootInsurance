@@ -25,6 +25,7 @@ class Company:
         self.num_clicked = 0   # number of impressions clicked currently
         self.train = True
         self.num_total_sold = 0
+        self.num_total_runs = 0
         self.num_total = num_total
         self.current_price = 0 # bidding price for current customer
         self.updateQ = updateQ
@@ -41,6 +42,7 @@ class Company:
         self.q_table = np.zeros([num_total + 1, num_total + 1, num_states, self.max_price - self.min_price + 1])
         
     def reset(self):
+        self.num_total_runs = 0
         self.num_sold = 0   
         self.num_clicked = 0
         self.num_total_sold = 0
@@ -90,15 +92,17 @@ class Company:
             reward = - self.current_price * is_clicked + 10 * self.max_price * is_sold
             self.updateQTable(is_clicked, is_sold, state, self.current_price, reward)
         else:
+            # 8 * i + 4 * v + 2 * d + m
             self.record['click'].append(is_clicked)
-            self.record['currently_insured'].append(state % 2)
-            self.record['number_of_vehicles'].append(state // 8)
-            self.record['number_of_drivers'].append((state // 4) % 2)
+            self.record['currently_insured'].append(state // 8)
+            self.record['number_of_vehicles'].append((state // 4) % 2)
+            self.record['number_of_drivers'].append((state // 2) % 2)
             self.record['rank'].append(rank)
             self.record['policies sold'].append(is_sold)
-            self.record['married'].append((state // 2) % 2)
+            self.record['married'].append(state % 2)
             self.record['current_price'].append(self.current_price + self.min_price)
             
+        self.num_total_runs += 1
         self.num_total_sold += is_sold
         self.num_clicked = (self.num_clicked + is_clicked) % self.num_total
         self.num_sold = (self.num_sold + is_sold) % self.num_total
@@ -150,22 +154,23 @@ class SearchWebsite:
         self.companies = [Company(updateQ) for _ in range(n_companies)]
         
         self.customer_click_prob = [
-            [0.571429, 0.200000, 0.100000, 0, 0],       #0
-            [0.636364, 0.250000, 0, 0.071429, 0],       #1
-            [0.509554, 0.215385, 0.147679, 0.038217, 0],#2
-            [0.500000, 0.137255, 0.147321, 0.059211, 0],#3
-            [0.514184, 0.206897, 0.194690, 0, 0],       #4
-            [0.523364, 0.189944, 0.136612, 0.050847, 0],#5
-            [0.488746, 0.161491, 0.087591, 0, 0],       #6
-            [0.582524, 0.208589, 0.185567, 0.037313, 0],#7
-            [0, 0, 0.047619, 0.121212, 0.017544],       #8
-            [0, 0, 0.294118, 0.080000, 0],              #9
-            [0, 0, 0.167568, 0.031546, 0.024777],       #10
-            [0, 0, 0.162963, 0.046053, 0.016299],       #11
-            [0, 0.175258, 0.125000, 0.031008, 0.010204],#12
-            [0, 0.137931, 0.143939, 0.036765, 0.020833],#13
-            [0, 0.193548, 0.123077, 0.039370, 0.022989],#14
-            [0, 0.231884, 0.167939, 0.033784, 0.033333]]
+            [0.5714285714285714, 0.2, 0.1, 0.0, 0.017324745211109452],
+            [0.5095541401273885, 0.2153846153846154, 0.14767932489451474, 0.03821656050955414, 0.01594486133680964],
+            [0.5141843971631206, 0.20689655172413796, 0.1946902654867257, 0.04572001049754619, 0.014959805790837303],
+            [0.4887459807073955, 0.16149068322981364, 0.08759124087591241, 0.06012767945601441, 0.01580683776918321],
+            [0.5553803429645067, 0.19523986521908968, 0.047619047619047616, 0.12121212121212123, 0.017543859649122806],
+            [0.5589188420090472, 0.16878783207961265, 0.16756756756756758, 0.031545741324921134, 0.024777006937561945],
+            [0.5301685507667087, 0.17525773195876287, 0.125, 0.031007751937984492, 0.010204081632653059],
+            [0.5420767126064493, 0.1935483870967742, 0.12307692307692307, 0.03937007874015748, 0.02298850574712644],
+            [0.6363636363636364, 0.25, 0.0, 0.07142857142857142, 0.019257668051969424],
+            [0.5, 0.13725490196078433, 0.14732142857142858, 0.05921052631578948, 0.011727362001360226],
+            [0.5233644859813084, 0.18994413407821228, 0.1366120218579235, 0.05084745762711865, 0.01853420944357649],
+            [0.5825242718446602, 0.2085889570552147, 0.1855670103092784, 0.037313432835820885, 0.016744904348269158],
+            [0.5592693623101355, 0.19521140912754428, 0.29411764705882354, 0.08, 0.0],
+            [0.5615446987596936, 0.18562769777417254, 0.16296296296296298, 0.046052631578947366, 0.016299137104506232],
+            [0.5332956548718327, 0.13793103448275862, 0.14393939393939395, 0.036764705882352935, 0.02083333333333333],
+            [0.5152471165247118, 0.2318840579710145, 0.16793893129770993, 0.03378378378378378, 0.03333333333333333]
+        ]
         self.customer_buy_prob = [
             [0.8974358974358975, 0.05128205128205128, 0.05128205128205128, 0, 0, 0], 
             [0.8205128205128205, 0.10256410256410256, 0.05128205128205128, 0, 0.02564102564102564, 0], 
@@ -198,13 +203,13 @@ class SearchWebsite:
             int: an int between 0 and 15 representing a customer's state.
 
         Note:
-            The formula is  8 * v + 4 * d + 2 * m + i
+            The formula is  8 * i + 4 * v + 2 * d + m
         """
         v = np.random.binomial(1, p_vehicle)
         d = np.random.binomial(1, p_driver)
         m = np.random.binomial(1, p_marital)
         i = np.random.binomial(1, p_insured)
-        return 8 * v + 4 * d + 2 * m + i
+        return 8 * i + 4 * v + 2 * d + m
 
     def getResult(self, state, ranking):
         """Generating the result based on state and ranking
@@ -227,18 +232,19 @@ class SearchWebsite:
         not_clicked = []
         for i in range(self.n_companies):
             if i != sold:
-                t = np.random.binomial(1, self.customer_click_prob[state][i])
+                t = np.random.binomial(1, self.customer_click_prob[state][ranking[i]])
                 if t == 1:
-                    clicked.append(ranking[i])
+                    clicked.append(i)
                 else:
-                    not_clicked.append(ranking[i])
+                    not_clicked.append(i)
         
         return sold, clicked, not_clicked
 
     def train(self):
+        for company in self.companies:
+            company.train = True
         for _ in range(self.n_total_rounds):
             self.auction()
-        self.reset()
     
     def reset(self):
         self.auction_result = []
@@ -246,9 +252,8 @@ class SearchWebsite:
             company.reset()
         
     def test(self):
-        self.auction_result = []
+        self.reset()
         for company in self.companies:
-            company.reset()
             company.train = False
         for _ in range(self.n_total_rounds):
             self.auction()
@@ -299,7 +304,7 @@ class SearchWebsite:
         indexes = list(range(self.n_companies))
         shuffle(indexes)
 
-        return sorted(indexes, key = price.__getitem__, reverse = True)
+        return sorted(indexes, key=price.__getitem__, reverse=True)
     
     def summary(self):
         if self.recording:
